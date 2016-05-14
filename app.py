@@ -3,6 +3,7 @@ import re
 import time
 
 from slackclient import SlackClient
+from whelk import shell
 
 token = os.environ['TOKEN']
 
@@ -51,7 +52,7 @@ if sc.rtm_connect():
 		for event in sc.rtm_read():
 			if (important and
 					event['type'] == 'message' and
-					'user' in event and event['user'] != user_id and
+					'user' in event and
 					event['channel'] == important['channel'] and
 					float(event['ts']) > float(important['ts'])):
 				sc.api_call('chat.delete',
@@ -70,12 +71,15 @@ if sc.rtm_connect():
 				text = event['text']
 
 				actions_found = []
-				for action in ('blink', 'marquee', 'important'):
+				for action in ('blink', 'marquee', 'important', 'cow'):
 					new_text = re.sub(r'&lt;{0}&gt;(.*)&lt;/{0}&gt;'.format(action),
 						r'\1', text)
 					if text != new_text:
 						actions_found.append(action)
 						text = new_text
+
+				if 'cow' in actions_found:
+					text = '```' + shell.cowsay(text)[1] + '```'
 
 				thing = {
 					'actions': actions_found,
@@ -85,10 +89,22 @@ if sc.rtm_connect():
 					'count': MAX_COUNT,
 				}
 
+				if 'cow' in actions_found:
+					sc.api_call('chat.update',
+						token=token,
+						channel=thing['channel'],
+						ts=thing['ts'],
+						text=text)
+
 				if actions_found:
 					stuff_to_do.append(thing)
 				if 'important' in actions_found:
 					important = thing
+					sc.api_call('chat.update',
+						token=token,
+						channel=thing['channel'],
+						ts=thing['ts'],
+						text=text)
 
 		time.sleep(0.25)
 		do_stuff()
