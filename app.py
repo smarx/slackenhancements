@@ -16,7 +16,7 @@ important = None
 
 stuff_to_do = []
 def do_stuff():
-	global stuff_to_do
+	global important, stuff_to_do
 	print stuff_to_do
 	for thing in stuff_to_do:
 		thing['count'] -= 1
@@ -43,12 +43,26 @@ def do_stuff():
 				text=text)
 
 	stuff_to_do = filter(lambda thing: thing['count'] > 0, stuff_to_do)
-	if important['count'] <= 0:
+	if important and important['count'] <= 0:
 		important = None
 
 if sc.rtm_connect():
 	while True:
 		for event in sc.rtm_read():
+			if (important and
+					event['type'] == 'message' and
+					'user' in event and event['user'] != user_id and
+					event['channel'] == important['channel'] and
+					float(event['ts']) > float(important['ts'])):
+				sc.api_call('chat.delete',
+					token=token,
+					channel=important['channel'],
+					ts=important['ts'])
+				important['ts'] = sc.api_call('chat.postMessage',
+					token=token,
+					channel=important['channel'],
+					text=important['text'],
+					as_user=True)['ts']
 			if event['type'] == 'message' and event.get('user') == user_id:
 				channel = event['channel']
 				timestamp = event['ts']
@@ -67,7 +81,7 @@ if sc.rtm_connect():
 					'actions': actions_found,
 					'channel': event['channel'],
 					'ts': event['ts'],
-					'text': match.groups()[0],
+					'text': text,
 					'count': MAX_COUNT,
 				}
 
