@@ -32,17 +32,13 @@ func Process(item *Item, api *slack.Client) {
 	}
 	if item.actions["blink"] {
 		if item.remainingCount%2 == 0 {
-			filler := "_"
-			if item.actions["cow"] {
-				filler = " "
-			}
-			text = strings.Repeat(filler, len(text))
+			text = strings.Repeat(" ", len(text))
 		}
 	}
 	if item.actions["cow"] {
 		text = "```\n" + cowsay.Format(text) + "\n```"
 	} else if item.actions["blink"] || item.actions["marquee"] {
-		text = "`" + text + "`"
+		text = "```" + text + "```"
 	}
 	item.remainingCount -= 1
 	if item.currentText == text {
