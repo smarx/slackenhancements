@@ -115,7 +115,7 @@ Loop:
 					ackID = -1
 				}
 			case *slack.MessageEvent:
-				if len(ev.SubType) > 0 {
+				if len(ev.SubType) > 0 || (important != nil && ev.Channel == important.channel && ev.Timestamp == important.timestamp) {
 					continue
 				}
 				if important != nil {
