@@ -32,7 +32,7 @@ func Process(item *Item, api *slack.Client) {
 	}
 	if item.Actions["blink"] {
 		if item.RemainingCount%2 == 0 {
-			text = strings.Repeat(" ", len(text))
+			text = strings.Repeat(" ", len([]rune(text)))
 		}
 	}
 	if item.Actions["cow"] {
