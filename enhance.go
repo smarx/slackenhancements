@@ -20,7 +20,6 @@ type Item struct {
 	Text           string
 	Channel        string
 	Timestamp      string
-	CurrentText    string
 }
 
 func Process(item *Item, api *slack.Client) {
@@ -42,10 +41,6 @@ func Process(item *Item, api *slack.Client) {
 		text = "```" + text + "```"
 	}
 	item.RemainingCount -= 1
-	if item.CurrentText == text {
-		item.RemainingCount = 0
-	}
-	item.CurrentText = text
 	go api.UpdateMessage(item.Channel, item.Timestamp, text)
 }
 
@@ -72,7 +67,7 @@ func ProcessForever(incoming chan *Item, api *slack.Client) {
 func FindTags(text string) (tags map[string]bool, stripped string) {
 	tags = make(map[string]bool)
 	stripped = text
-	var possible = []string{"blink", "marquee", "important", "cow"}
+	var possible = []string{"blink", "marquee", "cow"}
 
 	for i := range possible {
 		var tag = possible[i]
@@ -106,9 +101,6 @@ func main() {
 
 	UserID := response.UserID
 
-	var important *Item
-	ackID := -1
-
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
@@ -119,20 +111,9 @@ Loop:
 			switch ev := msg.Data.(type) {
 			case *slack.ConnectedEvent:
 				fmt.Println("Enhanced! You can now use <blink>, <marquee>, and <cow> to annoy your coworkers.")
-			case *slack.AckMessage:
-				if ev.ReplyTo == ackID {
-					important.Timestamp = ev.Timestamp
-					ackID = -1
-				}
 			case *slack.MessageEvent:
 				if len(ev.SubType) > 0 {
 					continue
-				}
-				if important != nil {
-					message := rtm.NewOutgoingMessage(important.CurrentText, important.Channel)
-					ackID = message.ID
-					rtm.SendMessage(message)
-					go api.DeleteMessage(important.Channel, important.Timestamp)
 				}
 				if ev.User != UserID {
 					continue
@@ -144,14 +125,7 @@ Loop:
 						RemainingCount: maxRemainingCount,
 						Text:           text,
 						Channel:        ev.Channel,
-						Timestamp:      ev.Timestamp,
-						CurrentText:    text}
-					if item.Actions["important"] {
-						important = &item
-					}
-					if (item.Actions["cow"] || item.Actions["important"]) && len(item.Actions) == 1 {
-						item.RemainingCount = 1
-					}
+						Timestamp:      ev.Timestamp}
 					if len(item.Actions) > 0 {
 						itemc <- &item
 					}
