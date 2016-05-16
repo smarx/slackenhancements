@@ -15,37 +15,38 @@ import (
 const maxRemainingCount = 240
 
 type Item struct {
-	actions        map[string]bool
-	remainingCount int
-	text           string
-	channel        string
-	timestamp      string
-	currentText    string
+	Actions        map[string]bool
+	RemainingCount int
+	Text           string
+	Channel        string
+	Timestamp      string
+	CurrentText    string
 }
 
 func Process(item *Item, api *slack.Client) {
-	text := item.text
-	if item.actions["marquee"] {
+	text := item.Text
+	if item.Actions["marquee"] {
 		text += "     "
-		howMuch := (maxRemainingCount - item.remainingCount) % len(text)
-		text = text[howMuch:] + text[:howMuch]
+		runes := []rune(text)
+		howMuch := (maxRemainingCount - item.RemainingCount) % len(runes)
+		text = string(runes[howMuch:]) + string(runes[:howMuch])
 	}
-	if item.actions["blink"] {
-		if item.remainingCount%2 == 0 {
+	if item.Actions["blink"] {
+		if item.RemainingCount%2 == 0 {
 			text = strings.Repeat(" ", len(text))
 		}
 	}
-	if item.actions["cow"] {
+	if item.Actions["cow"] {
 		text = "```\n" + cowsay.Format(text) + "\n```"
-	} else if item.actions["blink"] || item.actions["marquee"] {
+	} else if item.Actions["blink"] || item.Actions["marquee"] {
 		text = "```" + text + "```"
 	}
-	item.remainingCount -= 1
-	if item.currentText == text {
-		item.remainingCount = 0
+	item.RemainingCount -= 1
+	if item.CurrentText == text {
+		item.RemainingCount = 0
 	}
-	item.currentText = text
-	go api.UpdateMessage(item.channel, item.timestamp, text)
+	item.CurrentText = text
+	go api.UpdateMessage(item.Channel, item.Timestamp, text)
 }
 
 func ProcessForever(incoming chan *Item, api *slack.Client) {
@@ -57,7 +58,7 @@ func ProcessForever(incoming chan *Item, api *slack.Client) {
 			newItems := make([]*Item, 0, len(items))
 			for i := range items {
 				Process(items[i], api)
-				if items[i].remainingCount > 0 {
+				if items[i].RemainingCount > 0 {
 					newItems = append(newItems, items[i])
 				}
 			}
@@ -86,7 +87,14 @@ func FindTags(text string) (tags map[string]bool, stripped string) {
 }
 
 func main() {
-	api := slack.New(os.Getenv("TOKEN"))
+	token := os.Getenv("TOKEN")
+
+	if len(token) == 0 {
+		fmt.Println("Missing auth token. Please visit https://api.slack.com/docs/oauth-test-tokens and get a token for your account. Then set the TOKEN environment variable to that value.")
+		return
+	}
+
+	api := slack.New(token)
 
 	itemc := make(chan *Item)
 	go ProcessForever(itemc, api)
@@ -109,9 +117,11 @@ Loop:
 		select {
 		case msg := <-rtm.IncomingEvents:
 			switch ev := msg.Data.(type) {
+			case *slack.ConnectedEvent:
+				fmt.Println("Enhanced! You can now use <blink>, <marquee>, and <cow> to annoy your coworkers.")
 			case *slack.AckMessage:
 				if ev.ReplyTo == ackID {
-					important.timestamp = ev.Timestamp
+					important.Timestamp = ev.Timestamp
 					ackID = -1
 				}
 			case *slack.MessageEvent:
@@ -119,24 +129,30 @@ Loop:
 					continue
 				}
 				if important != nil {
-					message := rtm.NewOutgoingMessage(important.currentText, important.channel)
+					message := rtm.NewOutgoingMessage(important.CurrentText, important.Channel)
 					ackID = message.ID
 					rtm.SendMessage(message)
-					go api.DeleteMessage(important.channel, important.timestamp)
+					go api.DeleteMessage(important.Channel, important.Timestamp)
 				}
 				if ev.User != UserID {
 					continue
 				}
 				tags, text := FindTags(ev.Text)
 				if len(tags) > 0 {
-					item := Item{tags, maxRemainingCount, text, ev.Channel, ev.Timestamp, text}
-					if item.actions["important"] {
+					item := Item{
+						Actions:        tags,
+						RemainingCount: maxRemainingCount,
+						Text:           text,
+						Channel:        ev.Channel,
+						Timestamp:      ev.Timestamp,
+						CurrentText:    text}
+					if item.Actions["important"] {
 						important = &item
 					}
-					if (item.actions["cow"] || item.actions["important"]) && len(item.actions) == 1 {
-						item.remainingCount = 1
+					if (item.Actions["cow"] || item.Actions["important"]) && len(item.Actions) == 1 {
+						item.RemainingCount = 1
 					}
-					if len(item.actions) > 0 {
+					if len(item.Actions) > 0 {
 						itemc <- &item
 					}
 				}
