@@ -112,7 +112,7 @@ Loop:
 			case *slack.ConnectedEvent:
 				fmt.Println("Enhanced! You can now use <blink>, <marquee>, and <cow> to annoy your coworkers.")
 			case *slack.MessageEvent:
-				if len(ev.SubType) > 0 {
+				if len(ev.SubType) > 0 || ev.ReplyTo > 0 {
 					continue
 				}
 				if ev.User != UserID {
