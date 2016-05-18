@@ -126,6 +126,10 @@ Loop:
 						Text:           text,
 						Channel:        ev.Channel,
 						Timestamp:      ev.Timestamp}
+					if item.Actions["cow"] && len(item.Actions) == 1 {
+						// Don't keep editing the cow if it's not going to change.
+						item.RemainingCount = 1
+					}
 					if len(item.Actions) > 0 {
 						itemc <- &item
 					}
