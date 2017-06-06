@@ -132,7 +132,7 @@ Loop:
 						Text:           text,
 						Channel:        ev.Channel,
 						Timestamp:      ev.Timestamp}
-					if item.Actions["cow"] || item.Actions["escape"] && len(item.Actions) == 1 {
+					if (item.Actions["cow"] || item.Actions["escape"]) && len(item.Actions) == 1 {
 						// Don't keep editing if nothing's not going to change.
 						item.RemainingCount = 1
 					}
