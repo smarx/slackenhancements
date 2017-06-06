@@ -24,6 +24,9 @@ type Item struct {
 
 func Process(item *Item, api *slack.Client) {
 	text := item.Text
+	// TODO: more of this
+	text = strings.Replace(text, "&gt;", ">", -1)
+	text = strings.Replace(text, "&lt;", "<", -1)
 	if item.Actions["marquee"] {
 		text += "     "
 		runes := []rune(text)
@@ -32,13 +35,16 @@ func Process(item *Item, api *slack.Client) {
 	}
 	if item.Actions["blink"] {
 		if item.RemainingCount%2 == 0 {
-			text = strings.Repeat(" ", len([]rune(text)))
+			text = "\u2063" + strings.Repeat(" ", len([]rune(text)))
 		}
 	}
 	if item.Actions["cow"] {
 		text = "```\n" + cowsay.Format(text) + "\n```"
 	} else if item.Actions["blink"] || item.Actions["marquee"] {
 		text = "```" + text + "```"
+	}
+	if item.Actions["escape"] {
+		text = "\u2063" + text
 	}
 	item.RemainingCount -= 1
 	go api.UpdateMessage(item.Channel, item.Timestamp, text)
@@ -67,7 +73,7 @@ func ProcessForever(incoming chan *Item, api *slack.Client) {
 func FindTags(text string) (tags map[string]bool, stripped string) {
 	tags = make(map[string]bool)
 	stripped = text
-	var possible = []string{"blink", "marquee", "cow"}
+	var possible = []string{"blink", "marquee", "cow", "escape"}
 
 	for i := range possible {
 		var tag = possible[i]
@@ -110,7 +116,7 @@ Loop:
 		case msg := <-rtm.IncomingEvents:
 			switch ev := msg.Data.(type) {
 			case *slack.ConnectedEvent:
-				fmt.Println("Enhanced! You can now use <blink>, <marquee>, and <cow> to annoy your coworkers.")
+				fmt.Println("Enhanced! You can now use <blink>, <marquee>, <cow>, and <escape> to annoy your coworkers.")
 			case *slack.MessageEvent:
 				if len(ev.SubType) > 0 || ev.ReplyTo > 0 {
 					continue
@@ -126,8 +132,8 @@ Loop:
 						Text:           text,
 						Channel:        ev.Channel,
 						Timestamp:      ev.Timestamp}
-					if item.Actions["cow"] && len(item.Actions) == 1 {
-						// Don't keep editing the cow if it's not going to change.
+					if item.Actions["cow"] || item.Actions["escape"] && len(item.Actions) == 1 {
+						// Don't keep editing if nothing's not going to change.
 						item.RemainingCount = 1
 					}
 					if len(item.Actions) > 0 {
