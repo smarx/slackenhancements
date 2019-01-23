@@ -50,7 +50,7 @@ func Process(item *Item, api *slack.Client) {
 		text = "\u2063" + text
 	}
 	item.RemainingCount -= 1
-	go api.UpdateMessage(item.Channel, item.Timestamp, text)
+	go api.UpdateMessage(item.Channel, item.Timestamp, slack.MsgOptionText(text, false))
 }
 
 func ProcessForever(incoming chan *Item, api *slack.Client) {
